@@ -1,2 +1,2 @@
-# Areal_project
+# Aerial_project
 Hardware part of the project
