@@ -111,7 +111,7 @@ class LoggingExample:
             print('Could not add Stabilizer log config, bad configuration.')
 
         # Start a timer to disconnect in 10s
-        t = Timer(50, self._cf.close_link)
+        t = Timer(120, self._cf.close_link)
         t.start()
 
     def _stab_log_error(self, logconf, msg):
@@ -187,15 +187,8 @@ if __name__ == '__main__':
         control_commands = my_controller.step_control(sensor_data)
 
         cf.commander.send_hover_setpoint(control_commands[0], control_commands[1], control_commands[2]*180/np.pi, control_commands[3])
-
-        # Read sensor data including []
-        #sensor_data = drone.read_sensors()
-
-        # Control commands with [v_forward, v_left, yaw_rate, altitude]
-        # ---- Select only one of the following control methods ---- #
-        #control_commands = drone.action_from_keyboard()
-        #control_commands = my_controller.step_control(sensor_data)
-
-        #cf.commander.send_hover_setpoint(control_commands[0], control_commands[1], control_commands[2], control_commands[3])
+        
+        if my_controller.state == 'LANDED' :
+            break
 
     cf.commander.send_stop_setpoint()
