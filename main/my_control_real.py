@@ -12,18 +12,18 @@ import matplotlib.pyplot as plt
 # Landing and takeoff parameters
 flying_height = 0.4
 landed_height = 0.02
-landing_heigh_steps = 0.01
-liftoff_heigh_steps = 0.005
-pad_centering_threshold = 0.05
+landing_heigh_steps = 0.002
+liftoff_heigh_steps = 0.015
+pad_centering_threshold = 0.1
 
 # Speed parameters
 crossing_speed = 0.3
-exploration_speed = 0.3
-nominal_return_speed = 0.4
-landing_pad_scanning_speed = 0.2
+exploration_speed = 0.2
+nominal_return_speed = 0.3
+landing_pad_scanning_speed = 0.15
 P_vel = 1.5
 vel_x_target, vel_y_target = 0, 0 # Global variable used for smoothing
-speed_stable_threshold = 0.01
+speed_stable_threshold = 0.03
 
 # Obstacle parameters
 close_obstacle_limit = 0.2
@@ -40,7 +40,7 @@ min_y, max_y = 0, 3.0 # meter
 landing_region_x_limit = 3.5 
 landing_pad_size = 0.3
 range_max = 2.0 # meter, maximum range of distance sensor
-res_pos = 0.05 # meter, to match landing pad size
+res_pos = 0.05 # meter
 conf = 0.2 # certainty given by each measurement
 t = 0 # only for plotting
 
@@ -64,11 +64,12 @@ class MyController():
         self.previous_range_down = 0
 
         self.stopped_on_pad_flag = False
-        self.landing_pad_x_pos_edge_found = False
-        self.landing_pad_y_pos_edge_found = False
+        self.landing_pad_x_pos_found = False
+        self.landing_pad_y_pos_found = False
+        self.searching_x_flag = False
 
-        self.landing_pad_x_pos_edge = 0
-        self.landing_pad_y_pos_edge = 0
+        self.landing_pad_x_pos = 0
+        self.landing_pad_y_pos = 0
 
         self.x0 = 0
         self.y0 = 0
@@ -116,11 +117,12 @@ class MyController():
                 self.state = 'LANDING_PAD_CENTERING'
                 control_command = [0.0, 0.0, 0.0, self.height_desired]
                 if index_current_setpoint % (int(max_y/res_pos)*2) > int(max_y/res_pos) :
-                    self.landing_pad_y_pos_edge = self.y_drone
+                    self.landing_pad_y_pos = self.y_drone - landing_pad_size/2
                 else :
-                    self.landing_pad_y_pos_edge = self.y_drone - landing_pad_size
+                    self.landing_pad_y_pos = self.y_drone + landing_pad_size/2
 
-                self.landing_pad_y_pos_edge_found = True
+                self.landing_pad_y_pos_found = True
+                self.landing_pad_x_pos = self.x_drone
 
                 return control_command
             
@@ -128,7 +130,7 @@ class MyController():
 
             # Get the goal position and drone position
             x_target, y_target = find_exploration_setpoint()
-            distance_drone_to_goal = np.linalg.norm([x_target - self.x_drone, y_target- self.y_drone])
+            distance_drone_to_goal = np.linalg.norm([x_target - self.x_drone, y_target - self.y_drone])
 
             # When the drone reaches the goal setpoint
             if distance_drone_to_goal < 0.1:
@@ -150,57 +152,22 @@ class MyController():
 
             control_command = [0.0, 0.0, 0.0, self.height_desired]
 
-            # Stalibize and align with pad
-            if not self.stopped_on_pad_flag :
-                if (abs(sensor_data['v_forward']) > speed_stable_threshold or abs(sensor_data['v_left']) > speed_stable_threshold or abs(self.yaw) > 0.1) :
-                    # Orient toward 0 yaw
-                    yaw_goal = 0
-                    yaw_rate = yawing_P*self.yaw + yawing_D * sensor_data['yaw_rate'] #yawing_P*(((yaw_goal - sensor_data['yaw'])+np.pi)%(2*np.pi)-np.pi) in simulation
-
-                    control_command = [0.0, 0.0, yaw_rate, self.height_desired]
-
-                    print(self.yaw)
-                else :
-                    self.stopped_on_pad_flag = True
-
-            # Find X edge if Y centered
-            elif self.landing_pad_y_pos_edge_found and (not self.landing_pad_x_pos_edge_found) and abs(((self.landing_pad_y_pos_edge - landing_pad_size/2) - self.y_drone)) < 0.02:
-                control_command = [landing_pad_scanning_speed, 0.0, 0.0, self.height_desired]
-
-                print("searching X")
-
-                # If vertical edge detected -> store y pos
-                if abs(sensor_data['range_down'] - self.previous_range_down) > edge_detection_threshold :
-                    self.landing_pad_x_pos_edge_found = True
-                    self.landing_pad_x_pos_edge = self.x_drone
-
-                    self.goal_x = self.landing_pad_x_pos_edge - landing_pad_size/2
-                    self.goal_y = self.landing_pad_y_pos_edge - landing_pad_size/2
-
             # Center Y and X if pad center found
-            elif self.landing_pad_y_pos_edge_found and self.landing_pad_x_pos_edge_found :
-                print("Centering Both")
-                goal_dist = compute_dist(self.goal_x, self.goal_y, self.x_drone, self.y_drone)
+            if self.landing_pad_y_pos_found :
 
-                centering_speed = goal_dist/(landing_pad_size*2) # *2 for less agressive movement
+                goal_dist = compute_dist(self.landing_pad_x_pos, self.landing_pad_y_pos, self.x_drone, self.y_drone)
+
+                centering_speed = goal_dist/(landing_pad_size*4) # *2 for less agressive movement
                 centering_speed = np.clip(centering_speed, 0, nominal_return_speed)
 
-                control_command = track_setpoint(self.goal_x, self.goal_y, self.x_drone, self.y_drone, sensor_data, self.height_desired, centering_speed, self.yaw)
+                control_command = track_setpoint(self.landing_pad_x_pos, self.landing_pad_y_pos, self.x_drone, self.y_drone, sensor_data, self.height_desired, centering_speed, self.yaw)
+
+                print(goal_dist, sensor_data['v_forward'], sensor_data['v_left'])
 
                 # If well centered, change state to land on the goal
                 if goal_dist < pad_centering_threshold and abs(sensor_data['v_forward']) < speed_stable_threshold and abs(sensor_data['v_left']) < speed_stable_threshold:
                     self.state = 'GOAL_LANDING'
 
-            # Y centering if y edge found
-            if self.landing_pad_y_pos_edge_found and not self.landing_pad_x_pos_edge_found and self.stopped_on_pad_flag:
-
-                print("Centering Y")
-
-                v_front = P_vel * ((self.landing_pad_y_pos_edge - landing_pad_size/2) - self.y_drone)
-                v_front = np.clip(v_front, -landing_pad_scanning_speed, landing_pad_scanning_speed)
-                control_command[1] = v_front
-
-            self.previous_range_down = sensor_data['range_down']
 
             return control_command
         
@@ -260,6 +227,7 @@ class MyController():
         
         # GOAL_LANDING STATE #
         elif self.state == 'GOAL_LANDING':
+            print("Landing on goal")
             self.height_desired -= landing_heigh_steps
             control_command = [0.0, 0.0, 0.0, self.height_desired]
 
