@@ -4,7 +4,6 @@ import numpy as np
 from controller import Supervisor, Keyboard
 from pid_control import pid_velocity_fixed_height_controller
 from my_control import MyController
-import example
 import time, random
 
 # Set 'True' to enable random positions of obstacles and the drone
