@@ -292,6 +292,11 @@ class MyController():
 
             return control_command
 
+
+################################################################################################
+##################################### Additional functions #####################################
+################################################################################################
+
 # Funtion used to track a target while avoiding obstacles and allowing map exploration
 def track_setpoint(setpoint_x, setpoint_y, x_drone, y_drone, sensor_data, height_desired, nominal_speed, yaw) :
     global vel_x_target, vel_y_target
