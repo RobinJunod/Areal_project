@@ -62,8 +62,8 @@ class MyController():
 
         self.x_drone, self.y_drone = 0,0    # [m], Current drone position, in map referential
 
-        self.liftoff_point_x = 0.5          # [m], Starting liftoff pad position
-        self.liftoff_point_y = 2.15
+        self.liftoff_point_x = 0.75          # [m], Starting liftoff pad position
+        self.liftoff_point_y = 1.5
 
         self.goal_x, self.goal_y = 4.5,0.15 # [m], Initial goal set to a side of the landing region
 
