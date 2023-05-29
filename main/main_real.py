@@ -145,7 +145,7 @@ class LoggingExample:
         print('Disconnected from %s' % link_uri)
         self.is_connected = False
 
-def transform_data(data) :
+def transform_data(data) : # Convert to similar units as in simulation
     # Data dictionary
     sensor_data = {'x_global' : data['stateEstimate.x']/1,
                 'y_global' : data['stateEstimate.y']/1,
@@ -182,13 +182,13 @@ if __name__ == '__main__':
     # are just waiting until we are disconnected.
     while le.is_connected:
         time.sleep(0.01)
-        sensor_data = transform_data(le.data)
+        sensor_data = transform_data(le.data) # Convert to similar units as in simulation
 
         control_commands = my_controller.step_control(sensor_data)
 
         cf.commander.send_hover_setpoint(control_commands[0], control_commands[1], control_commands[2]*180/np.pi, control_commands[3])
         
-        if my_controller.state == 'LANDED' :
+        if my_controller.state == 'LANDED' : # Arrived on final pad
             break
 
     cf.commander.send_stop_setpoint()
